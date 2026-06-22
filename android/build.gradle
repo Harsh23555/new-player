@@ -1,0 +1,58 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// Workaround for older Flutter plugins (e.g. isar_flutter_libs 3.1.0) that do
+// not declare an Android `namespace`, which AGP 8+/9 requires. This reads the
+// legacy `package` value from each plugin's AndroidManifest and sets it as the
+// namespace, fixing "Namespace not specified" build failures.
+subprojects {
+    afterEvaluate { project ->
+        def androidExtension = project.extensions.findByName("android")
+        if (androidExtension != null && androidExtension.namespace == null) {
+            def manifestFile = project.file("src/main/AndroidManifest.xml")
+            if (manifestFile.exists()) {
+                def manifest = new groovy.xml.XmlSlurper().parse(manifestFile)
+                def pkg = manifest.@package.text()
+                if (pkg != null && !pkg.isEmpty()) {
+                    androidExtension.namespace = pkg
+                }
+            }
+        }
+    }
+}
+
+// Force consistent JVM target across all subprojects to avoid
+// "Inconsistent JVM-target compatibility" errors from plugins.
+subprojects {
+    afterEvaluate { project ->
+        def androidExtension = project.extensions.findByName("android")
+        if (androidExtension != null) {
+            androidExtension.compileSdk 36
+            androidExtension.compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+        }
+        project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
+}
+
+rootProject.layout.buildDirectory.set(file('../build'))
+subprojects {
+    project.layout.buildDirectory.set(rootProject.layout.buildDirectory.dir(project.name))
+}
+subprojects {
+    project.evaluationDependsOn(':app')
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.layout.buildDirectory
+}
