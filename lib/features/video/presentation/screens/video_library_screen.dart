@@ -162,6 +162,7 @@ class _VideoLibraryScreenState extends ConsumerState<VideoLibraryScreen> {
         onFavorite: () => ref
             .read(videoLibraryProvider.notifier)
             .toggleFavorite(videos[i]),
+        onLongPress: () => _showVideoOptions(context, ref, videos[i]),
       ),
     );
   }
@@ -179,6 +180,44 @@ class _VideoLibraryScreenState extends ConsumerState<VideoLibraryScreen> {
         onFavorite: () => ref
             .read(videoLibraryProvider.notifier)
             .toggleFavorite(videos[i]),
+        onLongPress: () => _showVideoOptions(context, ref, videos[i]),
+      ),
+    );
+  }
+
+  void _showVideoOptions(
+      BuildContext context, WidgetRef ref, VideoModel video) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              title: const Text('Delete',
+                  style: TextStyle(color: Colors.red)),
+              onTap: () async {
+                Navigator.pop(context);
+                final ok =
+                    await showConfirmDeleteDialog(context, video.title);
+                if (ok) {
+                  await ref
+                      .read(videoLibraryProvider.notifier)
+                      .deleteVideo(video);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('"${video.title}" deleted')),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -189,18 +228,21 @@ class _VideoGridCard extends StatelessWidget {
   final int index;
   final VoidCallback onTap;
   final VoidCallback onFavorite;
+  final VoidCallback? onLongPress;
 
   const _VideoGridCard({
     required this.video,
     required this.index,
     required this.onTap,
     required this.onFavorite,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: Container(
@@ -336,12 +378,14 @@ class _VideoListTile extends StatelessWidget {
   final int index;
   final VoidCallback onTap;
   final VoidCallback onFavorite;
+  final VoidCallback? onLongPress;
 
   const _VideoListTile({
     required this.video,
     required this.index,
     required this.onTap,
     required this.onFavorite,
+    this.onLongPress,
   });
 
   @override
@@ -350,6 +394,7 @@ class _VideoListTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(14),
         child: Container(
           height: 80,

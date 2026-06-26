@@ -5,6 +5,7 @@ import 'package:flutter_downloader/flutter_downloader.dart';
 
 import '../../../data/models/download_model.dart';
 import '../../../data/services/download_service.dart';
+import '../../../data/services/extractor_service.dart';
 
 // ── Download Manager State ───────────────────────────────────────────────────
 class DownloadManagerState {
@@ -17,6 +18,8 @@ class DownloadManagerState {
   final bool isValidating;
   final String? suggestedFileName;
   final int? suggestedFileSize;
+  final ExtractionResult? extractionResult;
+  final bool isExtracting;
 
   const DownloadManagerState({
     this.downloads = const [],
@@ -28,6 +31,8 @@ class DownloadManagerState {
     this.isValidating = false,
     this.suggestedFileName,
     this.suggestedFileSize,
+    this.extractionResult,
+    this.isExtracting = false,
   });
 
   DownloadManagerState copyWith({
@@ -40,6 +45,8 @@ class DownloadManagerState {
     bool? isValidating,
     String? suggestedFileName,
     int? suggestedFileSize,
+    ExtractionResult? extractionResult,
+    bool? isExtracting,
   }) =>
       DownloadManagerState(
         downloads: downloads ?? this.downloads,
@@ -51,6 +58,8 @@ class DownloadManagerState {
         isValidating: isValidating ?? this.isValidating,
         suggestedFileName: suggestedFileName ?? this.suggestedFileName,
         suggestedFileSize: suggestedFileSize ?? this.suggestedFileSize,
+        extractionResult: extractionResult ?? this.extractionResult,
+        isExtracting: isExtracting ?? this.isExtracting,
       );
 
   List<DownloadModel> get active =>
@@ -65,9 +74,10 @@ class DownloadManagerState {
 
 class DownloadManagerNotifier extends StateNotifier<DownloadManagerState> {
   final DownloadService _service;
+  final ExtractorService _extractor;
   ReceivePort? _port;
 
-  DownloadManagerNotifier(this._service) : super(const DownloadManagerState()) {
+  DownloadManagerNotifier(this._service, this._extractor) : super(const DownloadManagerState()) {
     _init();
   }
 
@@ -145,12 +155,28 @@ class DownloadManagerNotifier extends StateNotifier<DownloadManagerState> {
       urlError: null,
       suggestedFileName: null,
       suggestedFileSize: null,
+      extractionResult: null,
     );
   }
 
   Future<void> validateUrl() async {
     if (state.urlInput.isEmpty) return;
-    state = state.copyWith(isValidating: true, urlError: null);
+    state = state.copyWith(isValidating: true, urlError: null, extractionResult: null);
+    
+    // Try extraction first for media sites
+    if (state.urlInput.contains('youtube') || state.urlInput.contains('youtu.be')) {
+      final extraction = await _extractor.extract(state.urlInput);
+      if (extraction != null) {
+        state = state.copyWith(
+          isValidating: false,
+          urlValid: true,
+          extractionResult: extraction,
+          suggestedFileName: extraction.title,
+        );
+        return;
+      }
+    }
+
     final result = await _service.validateUrl(state.urlInput);
     state = state.copyWith(
       isValidating: false,
@@ -159,6 +185,36 @@ class DownloadManagerNotifier extends StateNotifier<DownloadManagerState> {
       suggestedFileName: result.fileName,
       suggestedFileSize: result.fileSize,
     );
+  }
+
+  Future<bool> startDownloadWithStream({
+    required ExtractionResult result,
+    required MediaStreamInfo stream,
+  }) async {
+    final fileName = '${result.title}.${stream.container ?? (stream.isVideo ? 'mp4' : 'mp3')}';
+    
+    final taskId = await _service.startDownload(
+      url: stream.url,
+      fileName: _sanitizeFileName(fileName),
+      thumbnailUrl: result.thumbnailUrl,
+    );
+
+    if (taskId == null) {
+      state = state.copyWith(error: 'Failed to start download');
+      return false;
+    }
+
+    await loadDownloads();
+    state = state.copyWith(
+      urlInput: '',
+      urlValid: false,
+      extractionResult: null,
+    );
+    return true;
+  }
+
+  String _sanitizeFileName(String name) {
+    return name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
   }
 
   Future<bool> startDownload({String? customFileName}) async {
@@ -220,5 +276,8 @@ class DownloadManagerNotifier extends StateNotifier<DownloadManagerState> {
 
 final downloadManagerProvider =
     StateNotifierProvider<DownloadManagerNotifier, DownloadManagerState>((ref) {
-  return DownloadManagerNotifier(ref.watch(downloadServiceProvider));
+  return DownloadManagerNotifier(
+    ref.watch(downloadServiceProvider),
+    ref.watch(extractorServiceProvider),
+  );
 });

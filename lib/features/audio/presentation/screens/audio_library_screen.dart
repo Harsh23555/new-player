@@ -172,10 +172,85 @@ class _AudioLibraryScreenState extends ConsumerState<AudioLibraryScreen> {
               onFavorite: () => ref
                   .read(audioLibraryProvider.notifier)
                   .toggleFavorite(track),
+              onLongPress: () => _showTileOptions(context, ref, track),
             );
           },
         );
     }
+  }
+
+  void _showTileOptions(
+      BuildContext context, WidgetRef ref, AudioModel track) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename'),
+              onTap: () async {
+                Navigator.pop(context);
+                final nameController =
+                    TextEditingController(text: track.title);
+                final newName = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Rename Track'),
+                    content: TextField(
+                      controller: nameController,
+                      autofocus: true,
+                      decoration: const InputDecoration(labelText: 'Title'),
+                    ),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel')),
+                      TextButton(
+                        onPressed: () =>
+                            Navigator.pop(ctx, nameController.text),
+                        child: const Text('Rename'),
+                      ),
+                    ],
+                  ),
+                );
+                if (newName != null &&
+                    newName.isNotEmpty &&
+                    newName != track.title) {
+                  await ref
+                      .read(audioLibraryProvider.notifier)
+                      .renameTrack(track, newName);
+                }
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              title: const Text('Delete',
+                  style: TextStyle(color: Colors.red)),
+              onTap: () async {
+                Navigator.pop(context);
+                final ok =
+                    await showConfirmDeleteDialog(context, track.title);
+                if (ok) {
+                  await ref
+                      .read(audioLibraryProvider.notifier)
+                      .deleteTrack(track);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('"${track.title}" deleted')),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -184,12 +259,14 @@ class _AudioTile extends StatelessWidget {
   final int index;
   final VoidCallback onTap;
   final VoidCallback onFavorite;
+  final VoidCallback? onLongPress;
 
   const _AudioTile({
     required this.track,
     required this.index,
     required this.onTap,
     required this.onFavorite,
+    this.onLongPress,
   });
 
   @override
@@ -200,6 +277,7 @@ class _AudioTile extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           borderRadius: BorderRadius.circular(14),
           child: Container(
             padding: const EdgeInsets.all(10),

@@ -81,6 +81,7 @@ class DownloadService {
   Future<String?> startDownload({
     required String url,
     required String fileName,
+    String? thumbnailUrl,
   }) async {
     try {
       final savePath = await downloadDirectory;
@@ -100,6 +101,7 @@ class DownloadService {
         ..url = url
         ..fileName = fileName
         ..savePath = savePath
+        ..thumbnailUrl = thumbnailUrl
         ..status = 0
         ..progress = 0
         ..totalBytes = 0

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:isar/isar.dart';
 import '../../core/database/isar_service.dart';
 import '../../core/utils/app_logger.dart';
@@ -201,11 +202,21 @@ class AudioRepository implements IAudioRepository {
   @override
   Future<void> deleteByPath(String path) async {
     try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
       await _isar.writeTxn(() async {
         await _isar.audioEntitys.where().pathEqualTo(path).deleteAll();
       });
     } catch (e, st) {
       AppLogger.error('AudioRepository.deleteByPath failed', error: e, stackTrace: st);
+    }
+  }
+
+  Future<void> rename(int id, String newTitle) async {
+    final track = await _isar.audioEntitys.get(id);
+    if (track != null) {
+      track.title = newTitle;
+      await _isar.writeTxn(() => _isar.audioEntitys.put(track));
     }
   }
 }

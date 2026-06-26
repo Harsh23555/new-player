@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/download_model.dart';
 import '../../providers/download_manager_provider.dart';
 import '../../../../shared/widgets/common_widgets.dart';
+import '../../../../data/services/extractor_service.dart';
+import '../widgets/quality_selection_sheet.dart';
 
 class DownloadManagerScreen extends ConsumerStatefulWidget {
   const DownloadManagerScreen({super.key});
@@ -235,22 +238,20 @@ class _DownloadManagerScreenState
                 child: GradientButton(
                   label: 'Download',
                   icon: Icons.download_rounded,
-                  isLoading: false,
+                  isLoading: state.isExtracting,
                   onPressed: !state.urlValid
                       ? null
                       : () async {
-                          final success = await ref
-                              .read(downloadManagerProvider.notifier)
-                              .startDownload();
-                          if (success && mounted) {
-                            _urlController.clear();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content:
-                                    Text('Download started!'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                          if (state.extractionResult != null) {
+                            _showQualitySheet(context, state.extractionResult!);
+                          } else {
+                            final success = await ref
+                                .read(downloadManagerProvider.notifier)
+                                .startDownload();
+                            if (success && mounted) {
+                              _urlController.clear();
+                              _showSuccessSnackBar(context);
+                            }
                           }
                         },
                   colors: [AppTheme.accentPink, AppTheme.primaryViolet],
@@ -337,6 +338,36 @@ class _DownloadManagerScreenState
     }
   }
 
+  void _showQualitySheet(BuildContext context, ExtractionResult result) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => QualitySelectionSheet(
+        result: result,
+        onSelected: (stream) async {
+          Navigator.pop(context);
+          final success = await ref
+              .read(downloadManagerProvider.notifier)
+              .startDownloadWithStream(result: result, stream: stream);
+          if (success && mounted) {
+            _urlController.clear();
+            _showSuccessSnackBar(context);
+          }
+        },
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Download started!'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   String _formatBytes(int bytes) {
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     if (bytes < 1024 * 1024 * 1024) {
@@ -377,13 +408,30 @@ class _DownloadCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(_statusIcon(download.status),
-                    color: statusColor, size: 22),
+                child: download.thumbnailUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: CachedNetworkImage(
+                          imageUrl: download.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Icon(
+                              _statusIcon(download.status),
+                              color: statusColor,
+                              size: 22),
+                          errorWidget: (context, url, error) => Icon(
+                              _statusIcon(download.status),
+                              color: statusColor,
+                              size: 22),
+                        ),
+                      )
+                    : Icon(_statusIcon(download.status),
+                        color: statusColor, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(

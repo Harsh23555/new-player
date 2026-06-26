@@ -70,10 +70,10 @@ class AudioModel extends Equatable {
     return '${(size / (1024 * 1024 * 1024)).toStringAsFixed(2)}GB';
   }
 
-  AudioModel copyWith({bool? isFavorite, int? playCount}) => AudioModel(
+  AudioModel copyWith({bool? isFavorite, int? playCount, String? title}) => AudioModel(
         id: id,
         path: path,
-        title: title,
+        title: title ?? this.title,
         artist: artist,
         album: album,
         genre: genre,

@@ -1,7 +1,11 @@
+import groovy.xml.XmlSlurper
+
 allprojects {
     repositories {
         google()
         mavenCentral()
+        // Fallback for some older artifacts or mirrors if needed
+        maven { url 'https://plugins.gradle.org/m2/' }
     }
 }
 

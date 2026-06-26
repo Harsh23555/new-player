@@ -15,6 +15,7 @@ import 'data/models/db/video_entity.dart';
 import 'data/models/db/download_entity.dart';
 import 'data/models/db/settings_entity.dart';
 import 'data/models/db/recently_played_entity.dart';
+import 'data/models/db/eq_settings_entity.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,6 +62,7 @@ Future<void> main() async {
       DownloadEntitySchema,
       SettingsEntitySchema,
       RecentlyPlayedEntitySchema,
+      EqSettingsEntitySchema,
     ],
     directory: dir.path,
     name: 'nova_player_db',

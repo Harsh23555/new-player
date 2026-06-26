@@ -108,6 +108,18 @@ class VideoLibraryNotifier extends StateNotifier<VideoLibraryState> {
     }).toList();
     state = state.copyWith(videos: updated);
   }
+
+  /// Permanently deletes the file from disk and removes it from Isar + state.
+  Future<void> deleteVideo(VideoModel video) async {
+    try {
+      await _repository.deleteByPath(video.path);
+    } catch (_) {
+      // If file was already gone treat as success — still remove from state
+    }
+    state = state.copyWith(
+      videos: state.videos.where((v) => v.id != video.id).toList(),
+    );
+  }
 }
 
 final videoLibraryProvider =

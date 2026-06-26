@@ -118,6 +118,31 @@ class AudioLibraryNotifier extends StateNotifier<AudioLibraryState> {
     }).toList();
     state = state.copyWith(tracks: updated);
   }
+
+  /// Permanently deletes the file from disk and removes it from Isar + state.
+  Future<void> deleteTrack(AudioModel track) async {
+    try {
+      await _repository.deleteByPath(track.path);
+    } catch (_) {
+      // If file was already gone treat as success — still remove from state
+    }
+    state = state.copyWith(
+      tracks: state.tracks.where((t) => t.id != track.id).toList(),
+    );
+  }
+
+  /// Updates the track title in Isar and the local state.
+  Future<void> renameTrack(AudioModel track, String newTitle) async {
+    await _repository.rename(track.id, newTitle); // removed ! as id is not nullable in Model
+    state = state.copyWith(
+      tracks: state.tracks.map((t) {
+        if (t.id == track.id) {
+          return t.copyWith(title: newTitle);
+        }
+        return t;
+      }).toList(),
+    );
+  }
 }
 
 final audioLibraryProvider =

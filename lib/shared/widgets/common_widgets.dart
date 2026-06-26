@@ -313,3 +313,34 @@ class NovaSearchBar extends StatelessWidget {
     );
   }
 }
+
+/// Shows a red-accented confirmation dialog before destructive delete actions.
+/// Returns `true` if the user confirmed, `false` otherwise.
+Future<bool> showConfirmDeleteDialog(
+  BuildContext context,
+  String title,
+) async {
+  return await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Delete file?'),
+          content: Text(
+            'Permanently delete "$title"?\nThis cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(_, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(_, true),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}

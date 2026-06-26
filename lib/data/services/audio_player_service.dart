@@ -5,6 +5,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:logger/logger.dart';
 
+import '../../core/services/equalizer_service.dart';
 import '../models/audio_model.dart';
 
 final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
@@ -14,11 +15,22 @@ final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
 });
 
 class AudioPlayerService {
-  final AudioPlayer _player = AudioPlayer();
+  late final AudioPlayer _player;
   final _logger = Logger();
 
+  AudioPlayerService() {
+    _player = AudioPlayer();
+    
+    // Send session ID to native equalizer
+    _player.androidAudioSessionIdStream.listen((id) {
+      if (id != null && id != 0) {
+        EqualizerService.setAudioSessionId(id);
+      }
+    });
+  }
+
+
   List<AudioModel> _queue = [];
-  int _currentIndex = 0;
 
   // Streams
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
@@ -72,7 +84,6 @@ class AudioPlayerService {
 
   Future<void> playQueue(List<AudioModel> audios, {int startIndex = 0}) async {
     _queue = audios;
-    _currentIndex = startIndex;
 
     final sources = audios.map((a) => AudioSource.uri(
       Uri.file(a.path),
@@ -100,7 +111,6 @@ class AudioPlayerService {
 
   Future<void> playSingle(AudioModel audio) async {
     _queue = [audio];
-    _currentIndex = 0;
     try {
       await _player.setAudioSource(
         AudioSource.uri(

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:isar/isar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/database/isar_service.dart';
@@ -22,6 +23,7 @@ abstract class IVideoRepository {
   Future<List<VideoModel>> getFavorites();
   Future<List<VideoModel>> getDownloaded();
   Future<int> getCount();
+  Future<void> deleteByPath(String path);
 }
 
 class VideoRepository implements IVideoRepository {
@@ -210,6 +212,21 @@ class VideoRepository implements IVideoRepository {
       return await _isar.videoEntitys.count();
     } catch (_) {
       return 0;
+    }
+  }
+
+  @override
+  Future<void> deleteByPath(String path) async {
+    try {
+      // 1. Delete physical file
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+      // 2. Remove from Isar
+      await _isar.writeTxn(() async {
+        await _isar.videoEntitys.filter().pathEqualTo(path).deleteAll();
+      });
+    } catch (e, st) {
+      AppLogger.error('VideoRepository.deleteByPath failed', error: e, stackTrace: st);
     }
   }
 }

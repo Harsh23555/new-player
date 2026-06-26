@@ -11,6 +11,8 @@ import '../../../../shared/widgets/common_widgets.dart';
 import '../../providers/audio_player_provider.dart';
 import '../../providers/audio_library_provider.dart';
 import '../../providers/sleep_timer_provider.dart';
+import 'package:nova_player/shared/providers/global_equalizer_provider.dart';
+import '../widgets/equalizer_sheet.dart';
 
 class AudioPlayerScreen extends ConsumerStatefulWidget {
   final AudioModel? initialAudio;
@@ -154,11 +156,30 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
             ),
           ),
           IconButton(
+            onPressed: () => _showEqualizer(context),
+            icon: Consumer(builder: (context, ref, _) {
+              final eq = ref.watch(globalEqProvider);
+              return Icon(
+                Icons.equalizer_rounded,
+                color: eq.enabled ? AppTheme.primaryViolet : null,
+              );
+            }),
+          ),
+          IconButton(
             onPressed: () => _showOptions(context),
             icon: const Icon(Icons.more_vert_rounded),
           ),
         ],
       ),
+    );
+  }
+
+  void _showEqualizer(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const EqualizerSheet(),
     );
   }
 
@@ -553,6 +574,35 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               leading: const Icon(Icons.info_outline_rounded),
               title: const Text('Song Info'),
               onTap: () => Navigator.pop(ctx),
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              title: const Text('Delete',
+                  style: TextStyle(color: Colors.red)),
+              onTap: () async {
+                Navigator.pop(ctx); // close options sheet
+                final track = ref.read(currentTrackProvider);
+                if (track == null) return;
+                final ok =
+                    await showConfirmDeleteDialog(context, track.title);
+                if (ok) {
+                  // Stop playback first
+                  await ref
+                      .read(audioPlayerNotifierProvider.notifier)
+                      .pause();
+                  await ref
+                      .read(audioLibraryProvider.notifier)
+                      .deleteTrack(track);
+                  if (mounted) {
+                    Navigator.pop(context); // pop player screen
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('"${track.title}" deleted')),
+                    );
+                  }
+                }
+              },
             ),
           ],
         ),
